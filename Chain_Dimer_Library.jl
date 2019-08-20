@@ -1,15 +1,16 @@
 using QuadGK
+using Plots
 
 ## Parameters
 # Band parameters
-t = 4.4945;     # Hopping parameter
-g = .1776;      # Overlap
-E = -4.8510;    # On-site energy
+const t = 4.4945;     # Hopping parameter
+const g = .1776;      # Overlap
+const E = -4.8510;    # On-site energy
 
-η = 1e-16;      # Small value used for i0
+const η = 1e-16;      # Small value used for i0
 
-ν = 1e-3;       # Relative tolerance for integration
-NumEvals = 1e5; # Max number of integrals in quadgk
+const ν = 1e-3;       # Relative tolerance for integration
+const NumEvals = 1e5; # Max number of integrals in quadgk
 
 ## Functions
 
@@ -19,7 +20,7 @@ function Eq(qd)
 end
 
 # Chain Propagator
-function Ξ(z, m)
+function Ξ(z, m :: Int)
     Λ = (E - z) / (2 * t + 2 * g * z)
     p = - 0.5 * (t + g * E) / (t + g * z)^2
     return p * ((Λ - √(Λ + 1) * √(Λ - 1))^abs.(m)) / ( √(Λ + 1) * √(Λ - 1))
