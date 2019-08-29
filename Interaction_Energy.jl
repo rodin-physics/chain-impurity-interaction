@@ -9,14 +9,14 @@ l_per = 10;      # Oscillation periodicity
 μ2 = Eq(0.5 * (pi - pi / l_per));      # Chemical potential Beats
 
 # On-site energy
-# ϵ = -0;
-ϵ = -7.2;
+ϵ = -0;
+# ϵ = -7.2;
 # Coupling energy
 V = 1 * t;
 
 # Calculations
-f1(l) = FI(μ1, l, ϵ, V);
-f2(l) = FI(μ2, l, ϵ, V);
+f1(l) = F_I(μ1,[Impurity(0, ϵ, V), Impurity(l, ϵ, V)]);
+f2(l) = F_I(μ2,[Impurity(0, ϵ, V), Impurity(l, ϵ, V)]);
 
 res1 = map(f1, ls)
 res2 = map(f2, ls)
@@ -33,6 +33,6 @@ plot(
         )
 
 plot!(ls, res2, linewidth = 2, color = RGB(215/255,67/255,84/255))
-plot!(ls, res1, linewidth = 2, color = RGB(100/255,101/255,218/255))
+plot!(ls, res1, linewidth = 2, color = RGB(100/255,101/255,218/255), line = :dot)
 
-savefig("Interaction_H.pdf")
+savefig("Interaction_0.pdf")

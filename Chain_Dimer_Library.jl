@@ -1,5 +1,7 @@
 using QuadGK
 using Plots
+using LinearAlgebra
+using LaTeXStrings
 
 ## Parameters
 # Band parameters
@@ -9,8 +11,15 @@ const E = -4.8510;    # On-site energy
 
 const η = 1e-16;      # Small value used for i0
 
-const ν = 1e-3;       # Relative tolerance for integration
+const ν = 1e-4;       # Relative tolerance for integration
 const NumEvals = 1e5; # Max number of integrals in quadgk
+
+# Impurity type
+struct Impurity
+    l :: Int
+    ϵ :: Float64
+    V :: Float64
+end
 
 ## Functions
 
@@ -21,40 +30,69 @@ end
 
 # Chain Propagator
 function Ξ(z, m :: Int)
-    Λ = (E - z) / (2 * t + 2 * g * z)
+    M = (E - z) / (2 * t + 2 * g * z)
     p = - 0.5 * (t + g * E) / (t + g * z)^2
-    return p * ((Λ - √(Λ + 1) * √(Λ - 1))^abs.(m)) / ( √(Λ + 1) * √(Λ - 1))
+    return p * ((M - √(M + 1) * √(M - 1))^abs.(m)) / ( √(M + 1) * √(M - 1))
 end
 
-## Green's functions for the impurities (including the chain-induced self-eenrgy)
-# Green's functions
-function G_Single(z, ϵ, V)
-    return 1 / (z - ϵ - V^2 * Ξ(z, 0))
+# Scattering matrix Λ
+function Λ(z, ImpsT :: Array{Impurity, 1})
+    posT = map(x -> x.l, ImpsT)
+    ϵsT = map(x -> x.ϵ, ImpsT)
+    VsT = map(x -> x.V, ImpsT)
+
+    nImps = length(ImpsT)
+
+    posT_Mat = repeat(posT, 1, nImps)
+    pos_Mat = transpose(posT_Mat)
+
+    Prop = (map((x, y) -> Ξ(z, x - y), posT_Mat, pos_Mat))
+
+    V = Diagonal(VsT)
+    ϵ = Diagonal(ϵsT)
+
+    Γ_Inv = z .* Matrix{Int}(I, nImps, nImps) .- ϵ
+
+    return (Γ_Inv .- V * Prop * V)
 end
 
-function G_Double(z, l, ϵ, V)
-    σz = [1 0; 0 1]
-    σx = [0 1; 1 0]
-    Gp = (σz + σx) / (z - ϵ - V^2 * Ξ(z, 0) - V^2 * Ξ(z, l))
-    Gm = (σz - σx) / (z - ϵ - V^2 * Ξ(z, 0) + V^2 * Ξ(z, l))
-    return (Gp + Gm) / 2
+# Integrand used to calculate the local density
+function Δρ_Integrand(r, z, Imps)
+    Λ_Inv = inv(Λ(z, Imps))
+
+    Vs = map(x -> x.V, Imps)
+    pos = map(x -> x.l, Imps)
+
+    V = Diagonal(Vs)
+
+    PropVector = reshape(map(x -> Ξ(z, r - x), pos), (length(Imps), 1))
+
+    return (transpose(PropVector) * V * Λ_Inv * V * PropVector)
 end
 
-# Spectral Functions one and two impurities
-function A_Single(ω, ϵ, V)
-    return -imag(2 * G_Single(ω + 1im * η, ϵ, V))
+# Local density function
+function Δρ(r, μ, Imps)
+    f_int(x) = Δρ_Integrand(r, μ + 1im * x, Imps)
+    res =  quadgk(f_int, -Inf, 0, Inf, maxevals  = NumEvals, rtol = ν)
+    return (res[1] / (2 * π))[1]
 end
 
-function A_Double(ω, ϵ, V, l)
-    G_Inv = 1 / G_Single(ω + 1im * η, ϵ, V)
-    return -imag(2 * G_Inv / (G_Inv^2 - V^4 * Ξ(ω + 1im * η, l)^2))
+# Integrand used to compute the interaction energy
+function F_I_Integrand(z, Imps)
+    Λ_ = Λ(z, Imps)
+
+    Vs = map(x -> x.V, Imps)
+    ϵs = map(x -> x.ϵ, Imps)
+    Ξ0 = Ξ(z, 0)
+
+    return (-log(det(Diagonal(1 ./ (z .- ϵs - Ξ0 .* Vs .* Vs)) * Λ_)) / (2 * π))
 end
 
-# Interaction Free energy
-function FI(μ, l, ϵ, V)
-    f(ω) = log(1 - ( V^2 * Ξ(1im * ω + μ, l) / ( 1im * ω + μ - ϵ - V^2 * Ξ(1im * ω + μ, 0)) )^2)
-    res = quadgk(f, -Inf, 0, Inf, rtol = ν, maxevals = NumEvals)[1]
-    return real(-res / (2 * π))
+# Impurity interaction energy
+function F_I(μ, Imps)
+    f_int(x) = F_I_Integrand(μ + 1im * x, Imps)
+    res = quadgk(f_int, -Inf, 0, Inf, maxevals = NumEvals, rtol = ν)
+    return real(res[1])
 end
 
 # Colors for plotting
