@@ -1,5 +1,3 @@
-using LaTeXStrings
-
 include("Chain_Dimer_Library.jl")
 
 # Parameters
